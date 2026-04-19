@@ -3,16 +3,31 @@ from crud_clientes import (
     crear_cliente,
     leer_clientes,
     buscar_clientes,
-    actualizar_cliente,
     eliminar_cliente,
     PREFIJO_TELEFONO,
 )
+from modal_edicion import ModalEdicion
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
 
 class AppRegistros(ctk.CTk):
+
+    # Paleta centralizada
+    COLOR_PRIMARIO       = "#1a5276"
+    COLOR_PRIMARIO_HOVER = "#21618c"
+    COLOR_EXITO          = "#2ecc71"
+    COLOR_ERROR          = "#e74c3c"
+    COLOR_INFO           = "#3498db"
+    COLOR_ALERTA         = "#f1c40f"
+    COLOR_NEUTRO         = "#5d6d7e"
+    COLOR_NEUTRO_HOVER   = "#717d8a"
+    COLOR_EDITAR         = "#7d6608"
+    COLOR_EDITAR_HOVER   = "#9a7d0a"
+    COLOR_ELIMINAR       = "#7b241c"
+    COLOR_ELIMINAR_HOVER = "#96281b"
+
     def __init__(self):
         super().__init__()
 
@@ -29,29 +44,27 @@ class AppRegistros(ctk.CTk):
     # ─────────────────────────────────────────
 
     def _construir_ui(self):
-        # Título
+        self._ui_titulo()
+        self._ui_formulario()
+        self._ui_buscador()
+        self._ui_estado()
+        self._ui_tabla()
+        self._ui_acciones()
+
+    def _ui_titulo(self):
         ctk.CTkLabel(
             self, text="REGISTRO EMPRESARIAL DE CLIENTES",
             font=("Arial", 22, "bold"),
         ).pack(pady=(18, 6))
 
-        # ── Formulario de registro ──────────────────────────────────────
+    def _ui_formulario(self):
         marco = ctk.CTkFrame(self, fg_color="transparent")
         marco.pack(pady=6, padx=20)
 
-        ancho = 340
+        self.entrada_nombre   = self._entry(marco, "NOMBRE COMPLETO")
+        self.entrada_correo   = self._entry(marco, "CORREO ELECTRÓNICO")
+        self.entrada_telefono = self._entry(marco, f"{PREFIJO_TELEFONO}_________")
 
-        self.entrada_nombre = ctk.CTkEntry(
-            marco, placeholder_text="NOMBRE COMPLETO", width=ancho)
-        self.entrada_nombre.pack(pady=4)
-
-        self.entrada_correo = ctk.CTkEntry(
-            marco, placeholder_text="CORREO ELECTRÓNICO", width=ancho)
-        self.entrada_correo.pack(pady=4)
-
-        self.entrada_telefono = ctk.CTkEntry(
-            marco, placeholder_text=f"{PREFIJO_TELEFONO}_________", width=ancho)
-        self.entrada_telefono.pack(pady=4)
         self.entrada_telefono.insert(0, PREFIJO_TELEFONO)
         self.entrada_telefono.bind("<FocusIn>",  self._colocar_cursor_telefono)
         self.entrada_telefono.bind("<KeyPress>", self._validar_prefijo_telefono)
@@ -59,66 +72,63 @@ class AppRegistros(ctk.CTk):
         ctk.CTkButton(
             marco, text="REGISTRAR NUEVO CLIENTE",
             command=self._registrar_cliente,
-            fg_color="#1a5276", hover_color="#21618c",
+            fg_color=self.COLOR_PRIMARIO,
+            hover_color=self.COLOR_PRIMARIO_HOVER,
         ).pack(pady=12, fill="x")
 
-        # ── Buscador — botones SIEMPRE visibles ────────────────────────
-        marco_busqueda = ctk.CTkFrame(self, fg_color="transparent")
-        marco_busqueda.pack(pady=(4, 8), padx=20)
+    def _ui_buscador(self):
+        marco = ctk.CTkFrame(self, fg_color="transparent")
+        marco.pack(pady=(4, 8), padx=20)
 
         self.entrada_buscar = ctk.CTkEntry(
-            marco_busqueda, placeholder_text="BUSCAR POR NOMBRE...", width=300)
+            marco, placeholder_text="BUSCAR POR NOMBRE...", width=300)
         self.entrada_buscar.pack(side="left")
         self.entrada_buscar.bind("<Return>", lambda e: self._consultar_cliente())
 
         ctk.CTkButton(
-            marco_busqueda, text="🔍 BUSCAR",
+            marco, text="🔍 BUSCAR",
             command=self._consultar_cliente,
-            fg_color="#1e8449", hover_color="#239b56",
-            width=110,
+            fg_color="#1e8449", hover_color="#239b56", width=110,
         ).pack(side="left", padx=(8, 6))
 
         ctk.CTkButton(
-            marco_busqueda, text="MOSTRAR TODOS",
+            marco, text="MOSTRAR TODOS",
             command=self._actualizar_lista,
-            fg_color="#5d6d7e", hover_color="#717d8a",
-            width=130,
+            fg_color=self.COLOR_NEUTRO,
+            hover_color=self.COLOR_NEUTRO_HOVER, width=130,
         ).pack(side="left")
 
-        # ── Etiqueta de estado ─────────────────────────────────────────
+    def _ui_estado(self):
         self.etiqueta_estado = ctk.CTkLabel(
             self, text="SISTEMA LISTO", font=("Arial", 12, "italic"))
         self.etiqueta_estado.pack(pady=2)
 
-        # ── Tabla de resultados ────────────────────────────────────────
-        self.caja_texto = ctk.CTkTextbox(
-            self, height=200, font=("Courier New", 12))
+    def _ui_tabla(self):
+        self.caja_texto = ctk.CTkTextbox(self, height=200, font=("Courier New", 12))
         self.caja_texto.pack(pady=(4, 6), padx=20, fill="both", expand=True)
 
-        # ── Botones de acción sobre un registro ───────────────────────
-        marco_acciones = ctk.CTkFrame(self, fg_color="transparent")
-        marco_acciones.pack(pady=(2, 14), padx=20)
+    def _ui_acciones(self):
+        marco = ctk.CTkFrame(self, fg_color="transparent")
+        marco.pack(pady=(2, 14), padx=20)
 
-        ctk.CTkLabel(
-            marco_acciones, text="ID:", font=("Arial", 13),
-        ).pack(side="left")
+        ctk.CTkLabel(marco, text="ID:", font=("Arial", 13)).pack(side="left")
 
         self.entrada_id = ctk.CTkEntry(
-            marco_acciones, placeholder_text="ID del cliente", width=90)
+            marco, placeholder_text="ID del cliente", width=90)
         self.entrada_id.pack(side="left", padx=(4, 12))
 
         ctk.CTkButton(
-            marco_acciones, text="✏  EDITAR",
+            marco, text="✏  EDITAR",
             command=self._abrir_modal_edicion,
-            fg_color="#7d6608", hover_color="#9a7d0a",
-            width=120,
+            fg_color=self.COLOR_EDITAR,
+            hover_color=self.COLOR_EDITAR_HOVER, width=120,
         ).pack(side="left", padx=(0, 8))
 
         ctk.CTkButton(
-            marco_acciones, text="🗑  ELIMINAR",
+            marco, text="🗑  ELIMINAR",
             command=self._eliminar_cliente,
-            fg_color="#7b241c", hover_color="#96281b",
-            width=120,
+            fg_color=self.COLOR_ELIMINAR,
+            hover_color=self.COLOR_ELIMINAR_HOVER, width=120,
         ).pack(side="left")
 
     # ─────────────────────────────────────────
@@ -132,9 +142,9 @@ class AppRegistros(ctk.CTk):
             self.entrada_telefono.get(),
         )
         if not ok:
-            self._set_estado(f"ERROR: {resultado}", "#e74c3c")
+            self._estado_error(f"ERROR: {resultado}")
             return
-        self._set_estado(f"REGISTRO EXITOSO — ID: {resultado}", "#2ecc71")
+        self._estado_ok(f"REGISTRO EXITOSO — ID: {resultado}")
         self._limpiar_entradas()
         self._actualizar_lista()
 
@@ -146,95 +156,53 @@ class AppRegistros(ctk.CTk):
         resultados = buscar_clientes(termino)
         self._renderizar_tabla(resultados)
         if resultados:
-            self._set_estado(
-                f"{len(resultados)} RESULTADO(S) PARA '{termino.upper()}'", "#3498db")
+            self._estado_info(f"{len(resultados)} RESULTADO(S) PARA '{termino.upper()}'")
         else:
-            self._set_estado(
-                f"SIN RESULTADOS PARA '{termino.upper()}'", "#f1c40f")
+            self._estado_alerta(f"SIN RESULTADOS PARA '{termino.upper()}'")
 
     def _actualizar_lista(self):
         self._renderizar_tabla(leer_clientes())
-        self._set_estado("LISTADO ACTUALIZADO", "white")
+        self._set_estado("LISTADO ACTUALIZADO")
 
     def _eliminar_cliente(self):
         id_cliente = self.entrada_id.get().strip()
         if not id_cliente:
-            self._set_estado("ERROR: INGRESA UN ID PARA ELIMINAR", "#e74c3c")
+            self._estado_error("ERROR: INGRESA UN ID PARA ELIMINAR")
             return
         ok, msg = eliminar_cliente(id_cliente)
         if not ok:
-            self._set_estado(f"ERROR: {msg}", "#e74c3c")
+            self._estado_error(f"ERROR: {msg}")
             return
         self._set_estado(f"CLIENTE {id_cliente} ELIMINADO", "#e67e22")
         self.entrada_id.delete(0, "end")
         self._actualizar_lista()
 
     def _abrir_modal_edicion(self):
-        """Abre una ventana secundaria para editar un cliente por ID."""
         id_cliente = self.entrada_id.get().strip()
         if not id_cliente:
-            self._set_estado("ERROR: INGRESA UN ID PARA EDITAR", "#e74c3c")
+            self._estado_error("ERROR: INGRESA UN ID PARA EDITAR")
             return
-
-        clientes = leer_clientes()
-        cliente = next((c for c in clientes if c["ID"] == id_cliente), None)
+        cliente = next((c for c in leer_clientes() if c["ID"] == id_cliente), None)
         if cliente is None:
-            self._set_estado(f"ERROR: NO SE ENCONTRÓ EL ID {id_cliente}", "#e74c3c")
+            self._estado_error(f"ERROR: NO SE ENCONTRÓ EL ID {id_cliente}")
             return
+        ModalEdicion(self, cliente, on_guardado=self._post_edicion)
 
-        # ── Modal ──────────────────────────────────────────────────────
-        modal = ctk.CTkToplevel(self)
-        modal.title(f"EDITAR CLIENTE — ID {id_cliente}")
-        modal.geometry("400x300")
-        modal.resizable(False, False)
-        modal.grab_set()
-
-        ctk.CTkLabel(
-            modal, text=f"EDITANDO ID: {id_cliente}",
-            font=("Arial", 15, "bold"),
-        ).pack(pady=(16, 10))
-
-        ancho = 320
-
-        e_nombre = ctk.CTkEntry(modal, width=ancho)
-        e_nombre.insert(0, cliente["NOMBRE"])
-        e_nombre.pack(pady=5)
-
-        e_correo = ctk.CTkEntry(modal, width=ancho)
-        e_correo.insert(0, cliente["CORREO"])
-        e_correo.pack(pady=5)
-
-        e_telefono = ctk.CTkEntry(modal, width=ancho)
-        e_telefono.insert(0, cliente["TELEFONO"])
-        e_telefono.pack(pady=5)
-
-        lbl_error = ctk.CTkLabel(modal, text="", text_color="#e74c3c", font=("Arial", 11))
-        lbl_error.pack()
-
-        def _guardar():
-            ok, msg = actualizar_cliente(
-                id_cliente,
-                e_nombre.get(),
-                e_correo.get(),
-                e_telefono.get(),
-            )
-            if not ok:
-                lbl_error.configure(text=f"ERROR: {msg}")
-                return
-            self._set_estado(f"CLIENTE {id_cliente} ACTUALIZADO", "#2ecc71")
-            self.entrada_id.delete(0, "end")
-            self._actualizar_lista()
-            modal.destroy()
-
-        ctk.CTkButton(
-            modal, text="GUARDAR CAMBIOS",
-            command=_guardar,
-            fg_color="#1a5276", hover_color="#21618c",
-        ).pack(pady=10, padx=20, fill="x")
+    def _post_edicion(self, id_cliente):
+        """Callback que ejecuta ModalEdicion al guardar con éxito."""
+        self._estado_ok(f"CLIENTE {id_cliente} ACTUALIZADO")
+        self.entrada_id.delete(0, "end")
+        self._actualizar_lista()
 
     # ─────────────────────────────────────────
     # HELPERS DE UI
     # ─────────────────────────────────────────
+
+    def _entry(self, parent, placeholder, width=340):
+        """Crea un CTkEntry con placeholder y lo empaqueta."""
+        e = ctk.CTkEntry(parent, placeholder_text=placeholder, width=width)
+        e.pack(pady=4)
+        return e
 
     def _renderizar_tabla(self, filas):
         self.caja_texto.configure(state="normal")
@@ -242,29 +210,34 @@ class AppRegistros(ctk.CTk):
         encabezado = f"{'ID':<6}| {'NOMBRE':<28}| {'CORREO':<28}| TEL\n"
         self.caja_texto.insert("end", encabezado + "─" * 82 + "\n")
         for fila in filas:
-            linea = (
+            self.caja_texto.insert(
+                "end",
                 f"{fila['ID']:<6}| {fila['NOMBRE']:<28}| "
-                f"{fila['CORREO']:<28}| {fila['TELEFONO']}\n"
+                f"{fila['CORREO']:<28}| {fila['TELEFONO']}\n",
             )
-            self.caja_texto.insert("end", linea)
         self.caja_texto.configure(state="disabled")
 
+    def _limpiar_entradas(self):
+        for campo in (self.entrada_nombre, self.entrada_correo):
+            campo.delete(0, "end")
+        self.entrada_telefono.delete(0, "end")
+        self.entrada_telefono.insert(0, PREFIJO_TELEFONO)
+
+    # Feedback semántico
     def _set_estado(self, mensaje, color="white"):
         self.etiqueta_estado.configure(text=mensaje, text_color=color)
 
-    def _limpiar_entradas(self):
-        self.entrada_nombre.delete(0, "end")
-        self.entrada_correo.delete(0, "end")
-        self.entrada_telefono.delete(0, "end")
-        self.entrada_telefono.insert(0, PREFIJO_TELEFONO)
+    def _estado_ok(self, msg):     self._set_estado(msg, self.COLOR_EXITO)
+    def _estado_error(self, msg):  self._set_estado(msg, self.COLOR_ERROR)
+    def _estado_info(self, msg):   self._set_estado(msg, self.COLOR_INFO)
+    def _estado_alerta(self, msg): self._set_estado(msg, self.COLOR_ALERTA)
 
     # ─────────────────────────────────────────
     # TELÉFONO — PROTECCIÓN DEL PREFIJO
     # ─────────────────────────────────────────
 
     def _colocar_cursor_telefono(self, event=None):
-        texto = self.entrada_telefono.get()
-        if not texto.startswith(PREFIJO_TELEFONO):
+        if not self.entrada_telefono.get().startswith(PREFIJO_TELEFONO):
             self.entrada_telefono.delete(0, "end")
             self.entrada_telefono.insert(0, PREFIJO_TELEFONO)
         self.entrada_telefono.icursor(len(PREFIJO_TELEFONO))
@@ -297,9 +270,7 @@ class AppRegistros(ctk.CTk):
         self.update_idletasks()
         w, h = self.winfo_width(), self.winfo_height()
         sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
-        x = (sw - w) // 2
-        y = max((sh - h) // 2 - 30, 0)
-        self.geometry(f"+{x}+{y}")
+        self.geometry(f"+{(sw - w) // 2}+{max((sh - h) // 2 - 30, 0)}")
 
 
 if __name__ == "__main__":
