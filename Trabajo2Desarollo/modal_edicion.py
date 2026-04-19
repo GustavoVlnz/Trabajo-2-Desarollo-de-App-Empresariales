@@ -1,3 +1,4 @@
+import re
 import customtkinter as ctk
 from crud_clientes import actualizar_cliente, PREFIJO_TELEFONO
 
@@ -29,7 +30,8 @@ class ModalEdicion(ctk.CTkToplevel):
 
         self._e_nombre   = self._entry_precargado(self._cliente["NOMBRE"])
         self._e_correo   = self._entry_precargado(self._cliente["CORREO"])
-        self._e_telefono = self._entry_precargado(self._cliente["TELEFONO"])
+        self._telefono_var = ctk.StringVar(value=self._cliente["TELEFONO"])
+        self._e_telefono = self._entry_telefono(self._telefono_var)
 
         self._lbl_error = ctk.CTkLabel(
             self, text="", text_color=self.COLOR_ERROR, font=("Arial", 11))
@@ -48,6 +50,56 @@ class ModalEdicion(ctk.CTkToplevel):
         e.insert(0, valor)
         e.pack(pady=5)
         return e
+
+    def _entry_telefono(self, variable, width=320):
+        e = ctk.CTkEntry(
+            self,
+            textvariable=variable,
+            placeholder_text=f"{PREFIJO_TELEFONO}XXXX XXXX",
+            width=width,
+        )
+        e.pack(pady=5)
+        variable.trace_add("write", self._on_telefono_var_changed)
+        e.bind("<FocusIn>", self._colocar_cursor_telefono)
+        e.bind("<KeyPress>", self._validar_prefijo_telefono)
+        return e
+
+    def _on_telefono_var_changed(self, *args):
+        if getattr(self, "_telefono_actualizando", False):
+            return
+        self._telefono_actualizando = True
+        try:
+            texto = self._telefono_var.get() or ""
+            if not texto.startswith(PREFIJO_TELEFONO):
+                texto = PREFIJO_TELEFONO + texto
+            digitos = re.sub(r"\D", "", texto[len(PREFIJO_TELEFONO):])[:8]
+            if len(digitos) <= 4:
+                nuevo = PREFIJO_TELEFONO + digitos
+            else:
+                nuevo = PREFIJO_TELEFONO + digitos[:4] + " " + digitos[4:]
+            if texto != nuevo:
+                self._telefono_var.set(nuevo)
+            if int(self._e_telefono.index("insert")) < len(PREFIJO_TELEFONO):
+                self._e_telefono.icursor(len(PREFIJO_TELEFONO))
+        finally:
+            self._telefono_actualizando = False
+
+    def _colocar_cursor_telefono(self, event=None):
+        if not self._telefono_var.get().startswith(PREFIJO_TELEFONO):
+            self._telefono_var.set(PREFIJO_TELEFONO)
+        self._e_telefono.icursor(len(PREFIJO_TELEFONO))
+
+    def _validar_prefijo_telefono(self, event):
+        cursor = int(self._e_telefono.index("insert"))
+        limite = len(PREFIJO_TELEFONO)
+        if event.keysym == "BackSpace" and cursor <= limite:
+            return "break"
+        if event.keysym == "Delete" and cursor < limite:
+            return "break"
+        if event.keysym in ("Left", "Home"):
+            self._e_telefono.icursor(limite)
+            return "break"
+        self.after(1, self._colocar_cursor_telefono)
 
     def _guardar(self):
         nombre   = self._e_nombre.get().strip()

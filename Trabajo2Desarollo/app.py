@@ -1,3 +1,4 @@
+import re
 import customtkinter as ctk
 from crud_clientes import (
     crear_cliente,
@@ -70,10 +71,17 @@ class AppRegistros(ctk.CTk):
 
         self.entrada_nombre   = self._entry(marco, "NOMBRE COMPLETO")
         self.entrada_correo   = self._entry(marco, "CORREO ELECTRÓNICO")
-        self.entrada_telefono = self._entry(marco, f"{PREFIJO_TELEFONO}_________")
 
-        self.entrada_telefono.insert(0, PREFIJO_TELEFONO)
-        self.entrada_telefono.bind("<FocusIn>",  self._colocar_cursor_telefono)
+        self.telefono_var = ctk.StringVar(value=PREFIJO_TELEFONO)
+        self.entrada_telefono = ctk.CTkEntry(
+            marco,
+            textvariable=self.telefono_var,
+            placeholder_text=f"{PREFIJO_TELEFONO}XXXX XXXX",
+            width=340,
+        )
+        self.entrada_telefono.pack(pady=4)
+        self.telefono_var.trace_add("write", self._on_telefono_var_changed)
+        self.entrada_telefono.bind("<FocusIn>", self._colocar_cursor_telefono)
         self.entrada_telefono.bind("<KeyPress>", self._validar_prefijo_telefono)
 
         ctk.CTkButton(
@@ -311,8 +319,7 @@ class AppRegistros(ctk.CTk):
     def _limpiar_entradas(self):
         for campo in (self.entrada_nombre, self.entrada_correo):
             campo.delete(0, "end")
-        self.entrada_telefono.delete(0, "end")
-        self.entrada_telefono.insert(0, PREFIJO_TELEFONO)
+        self.telefono_var.set(PREFIJO_TELEFONO)
 
     # Feedback semántico
     def _set_estado(self, mensaje, color="white"):
@@ -345,13 +352,41 @@ class AppRegistros(ctk.CTk):
             return "break"
         self.after(1, self._reforzar_prefijo_telefono)
 
+    def _on_telefono_var_changed(self, *args):
+        if getattr(self, "_telefono_actualizando", False):
+            return
+        self._telefono_actualizando = True
+        try:
+            texto = self.telefono_var.get() or ""
+            if not texto.startswith(PREFIJO_TELEFONO):
+                texto = PREFIJO_TELEFONO + texto
+            digitos = re.sub(r"\D", "", texto[len(PREFIJO_TELEFONO):])[:8]
+            if len(digitos) <= 4:
+                nuevo = PREFIJO_TELEFONO + digitos
+            else:
+                nuevo = PREFIJO_TELEFONO + digitos[:4] + " " + digitos[4:]
+            if texto != nuevo:
+                self.telefono_var.set(nuevo)
+            if int(self.entrada_telefono.index("insert")) < len(PREFIJO_TELEFONO):
+                self.entrada_telefono.icursor(len(PREFIJO_TELEFONO))
+        finally:
+            self._telefono_actualizando = False
+
     def _reforzar_prefijo_telefono(self):
-        texto = self.entrada_telefono.get()
+        texto = self.telefono_var.get() or ""
         if not texto.startswith(PREFIJO_TELEFONO):
-            parte = texto.lstrip(PREFIJO_TELEFONO.strip())
-            self.entrada_telefono.delete(0, "end")
-            self.entrada_telefono.insert(0, PREFIJO_TELEFONO + parte)
-            self.entrada_telefono.icursor(len(PREFIJO_TELEFONO) + len(parte))
+            digitos = re.sub(r"\D", "", texto)
+            if digitos.startswith("56"):
+                digitos = digitos[2:]
+            if len(digitos) <= 4:
+                nuevo = PREFIJO_TELEFONO + digitos[:8]
+            else:
+                nuevo = PREFIJO_TELEFONO + digitos[:4] + " " + digitos[4:8]
+            self.telefono_var.set(nuevo)
+        elif len(texto) < len(PREFIJO_TELEFONO):
+            self.telefono_var.set(PREFIJO_TELEFONO)
+        if int(self.entrada_telefono.index("insert")) < len(PREFIJO_TELEFONO):
+            self.entrada_telefono.icursor(len(PREFIJO_TELEFONO))
 
     # ─────────────────────────────────────────
     # UTILIDADES DE VENTANA
