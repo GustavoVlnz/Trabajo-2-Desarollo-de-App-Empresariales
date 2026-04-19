@@ -4,6 +4,7 @@ from crud_clientes import (
     leer_clientes,
     buscar_clientes,
     eliminar_cliente,
+    validar_integridad_csv,
     PREFIJO_TELEFONO,
 )
 from modal_edicion import ModalEdicion
@@ -37,7 +38,13 @@ class AppRegistros(ctk.CTk):
         self.after(100, self._centrar_ventana)
 
         self._construir_ui()
-        self._actualizar_lista()
+        
+        # Validar integridad del CSV al iniciar
+        ok, msg = validar_integridad_csv()
+        if not ok:
+            self._estado_error(f"⚠️ ADVERTENCIA: {msg}")
+        else:
+            self._actualizar_lista()
 
     # ─────────────────────────────────────────
     # CONSTRUCCIÓN DE LA UI
@@ -136,57 +143,141 @@ class AppRegistros(ctk.CTk):
     # ─────────────────────────────────────────
 
     def _registrar_cliente(self):
-        ok, resultado = crear_cliente(
-            self.entrada_nombre.get(),
-            self.entrada_correo.get(),
-            self.entrada_telefono.get(),
-        )
-        if not ok:
-            self._estado_error(f"ERROR: {resultado}")
+        nombre   = self.entrada_nombre.get().strip()
+        correo   = self.entrada_correo.get().strip()
+        telefono = self.entrada_telefono.get().strip()
+
+        # Validar campos no vacíos
+        if not nombre:
+            self._estado_error("ERROR: EL NOMBRE NO PUEDE ESTAR VACÍO")
             return
-        self._estado_ok(f"REGISTRO EXITOSO — ID: {resultado}")
-        self._limpiar_entradas()
-        self._actualizar_lista()
+        if not correo:
+            self._estado_error("ERROR: EL CORREO NO PUEDE ESTAR VACÍO")
+            return
+        if not telefono or telefono == PREFIJO_TELEFONO:
+            self._estado_error("ERROR: EL TELÉFONO NO PUEDE ESTAR VACÍO")
+            return
+
+        try:
+            ok, resultado = crear_cliente(nombre, correo, telefono)
+            if not ok:
+                self._estado_error(f"ERROR: {resultado}")
+                return
+            self._estado_ok(f"REGISTRO EXITOSO — ID: {resultado}")
+            self._limpiar_entradas()
+            self._actualizar_lista()
+        except Exception as e:
+            self._estado_error(f"ERROR INESPERADO: {e}")
 
     def _consultar_cliente(self):
         termino = self.entrada_buscar.get().strip()
         if not termino:
             self._actualizar_lista()
             return
-        resultados = buscar_clientes(termino)
-        self._renderizar_tabla(resultados)
-        if resultados:
-            self._estado_info(f"{len(resultados)} RESULTADO(S) PARA '{termino.upper()}'")
-        else:
-            self._estado_alerta(f"SIN RESULTADOS PARA '{termino.upper()}'")
+        try:
+            resultados = buscar_clientes(termino)
+            self._renderizar_tabla(resultados)
+            if resultados:
+                self._estado_info(f"{len(resultados)} RESULTADO(S) PARA '{termino.upper()}'")
+            else:
+                self._estado_alerta(f"SIN RESULTADOS PARA '{termino.upper()}'")
+        except Exception as e:
+            self._estado_error(f"ERROR AL BUSCAR: {e}")
 
     def _actualizar_lista(self):
-        self._renderizar_tabla(leer_clientes())
-        self._set_estado("LISTADO ACTUALIZADO")
+        try:
+            self._renderizar_tabla(leer_clientes())
+            self._set_estado("LISTADO ACTUALIZADO")
+        except Exception as e:
+            self._estado_error(f"ERROR AL CARGAR LISTADO: {e}")
+
+    def _validar_id(self, id_str):
+        """Valida que el ID no esté vacío y sea alfanumérico."""
+        id_limpio = id_str.strip()
+        if not id_limpio:
+            return False, "ERROR: INGRESA UN ID"
+        if not id_limpio.replace("-", "").replace("_", "").isalnum():
+            return False, "ERROR: EL ID DEBE SER ALFANUMÉRICO"
+        return True, id_limpio
+
+    def _confirmar_eliminacion(self, id_cliente):
+        """Abre un diálogo de confirmación antes de eliminar."""
+        ventana_confirm = ctk.CTkToplevel(self)
+        ventana_confirm.title("CONFIRMAR ELIMINACIÓN")
+        ventana_confirm.geometry("350x150")
+        ventana_confirm.resizable(False, False)
+        ventana_confirm.grab_set()
+        ventana_confirm.after(100, ventana_confirm.lift)
+
+        ctk.CTkLabel(
+            ventana_confirm,
+            text=f"¿ELIMINAR CLIENTE ID {id_cliente}?",
+            font=("Arial", 13, "bold"),
+        ).pack(pady=20)
+
+        ctk.CTkLabel(
+            ventana_confirm,
+            text="Esta acción no se puede deshacer",
+            font=("Arial", 11),
+            text_color="#f1c40f",
+        ).pack(pady=5)
+
+        marco_botones = ctk.CTkFrame(ventana_confirm, fg_color="transparent")
+        marco_botones.pack(pady=15)
+
+        def confirmar():
+            self._eliminar_cliente_confirmado(id_cliente)
+            ventana_confirm.destroy()
+
+        ctk.CTkButton(
+            marco_botones, text="SÍ, ELIMINAR",
+            command=confirmar,
+            fg_color=self.COLOR_ELIMINAR,
+            hover_color=self.COLOR_ELIMINAR_HOVER, width=130,
+        ).pack(side="left", padx=5)
+
+        ctk.CTkButton(
+            marco_botones, text="CANCELAR",
+            command=ventana_confirm.destroy,
+            fg_color=self.COLOR_NEUTRO,
+            hover_color=self.COLOR_NEUTRO_HOVER, width=130,
+        ).pack(side="left", padx=5)
+
+    def _eliminar_cliente_confirmado(self, id_cliente):
+        """Ejecuta la eliminación después de confirmación."""
+        try:
+            ok, msg = eliminar_cliente(id_cliente)
+            if not ok:
+                self._estado_error(f"ERROR: {msg}")
+                return
+            self._set_estado(f"CLIENTE {id_cliente} ELIMINADO", "#e67e22")
+            self.entrada_id.delete(0, "end")
+            self._actualizar_lista()
+        except Exception as e:
+            self._estado_error(f"ERROR AL ELIMINAR: {e}")
 
     def _eliminar_cliente(self):
-        id_cliente = self.entrada_id.get().strip()
-        if not id_cliente:
-            self._estado_error("ERROR: INGRESA UN ID PARA ELIMINAR")
-            return
-        ok, msg = eliminar_cliente(id_cliente)
+        ok, id_cliente = self._validar_id(self.entrada_id.get())
         if not ok:
-            self._estado_error(f"ERROR: {msg}")
+            self._estado_error(id_cliente)
             return
-        self._set_estado(f"CLIENTE {id_cliente} ELIMINADO", "#e67e22")
-        self.entrada_id.delete(0, "end")
-        self._actualizar_lista()
+        self._confirmar_eliminacion(id_cliente)
 
     def _abrir_modal_edicion(self):
-        id_cliente = self.entrada_id.get().strip()
-        if not id_cliente:
-            self._estado_error("ERROR: INGRESA UN ID PARA EDITAR")
+        ok, id_cliente = self._validar_id(self.entrada_id.get())
+        if not ok:
+            self._estado_error(id_cliente)
             return
-        cliente = next((c for c in leer_clientes() if c["ID"] == id_cliente), None)
-        if cliente is None:
-            self._estado_error(f"ERROR: NO SE ENCONTRÓ EL ID {id_cliente}")
-            return
-        ModalEdicion(self, cliente, on_guardado=self._post_edicion)
+        
+        try:
+            clientes = leer_clientes()
+            cliente = next((c for c in clientes if c["ID"] == id_cliente), None)
+            if cliente is None:
+                self._estado_error(f"ERROR: NO SE ENCONTRÓ EL ID {id_cliente}")
+                return
+            ModalEdicion(self, cliente, on_guardado=self._post_edicion)
+        except Exception as e:
+            self._estado_error(f"ERROR AL ABRIR MODAL: {e}")
 
     def _post_edicion(self, id_cliente):
         """Callback que ejecuta ModalEdicion al guardar con éxito."""

@@ -50,14 +50,32 @@ class ModalEdicion(ctk.CTkToplevel):
         return e
 
     def _guardar(self):
-        ok, msg = actualizar_cliente(
-            self._cliente["ID"],
-            self._e_nombre.get(),
-            self._e_correo.get(),
-            self._e_telefono.get(),
-        )
-        if not ok:
-            self._lbl_error.configure(text=f"ERROR: {msg}")
+        nombre   = self._e_nombre.get().strip()
+        correo   = self._e_correo.get().strip()
+        telefono = self._e_telefono.get().strip()
+
+        # Validar campos no vacíos
+        if not nombre:
+            self._lbl_error.configure(text="ERROR: EL NOMBRE NO PUEDE ESTAR VACÍO")
             return
-        self._on_guardado(self._cliente["ID"])
-        self.destroy()
+        if not correo:
+            self._lbl_error.configure(text="ERROR: EL CORREO NO PUEDE ESTAR VACÍO")
+            return
+        if not telefono or telefono == PREFIJO_TELEFONO:
+            self._lbl_error.configure(text="ERROR: EL TELÉFONO NO PUEDE ESTAR VACÍO")
+            return
+
+        try:
+            ok, msg = actualizar_cliente(
+                self._cliente["ID"],
+                nombre,
+                correo,
+                telefono,
+            )
+            if not ok:
+                self._lbl_error.configure(text=f"ERROR: {msg}")
+                return
+            self._on_guardado(self._cliente["ID"])
+            self.destroy()
+        except Exception as e:
+            self._lbl_error.configure(text=f"ERROR INESPERADO: {e}")
